@@ -48,5 +48,3 @@ def split_nd_tiles_colorspace(tiles: List[np.ndarray]) -> Tuple[np.ndarray]:
 # channel_arrays = split_nd_tiles_colorspace(tiles)
 # channel_arrays will contain the N arrays representing individual color channels
 
-
-

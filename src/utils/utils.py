@@ -17,10 +17,48 @@ import kornia as K
 import kornia.enhance as ke
 import image_slicer as slicer
 
-
+import pickle
 import imutils
+import os
 
 
+
+
+def create_descriptor_database(filepath:str, filename:Optional[str] = None) -> None:
+    db = {}
+    path = os.path.join(filepath, filename) if filename is not None else filepath
+
+    abs_path = os.path.dirname(path)
+    os.makedirs(abs_path, exist_ok=True)
+    with open(path, 'wb') as f:
+        pickle.dump(db, f)
+
+def get_descriptor_database(filepath:str, filename:Optional[str] = None) -> Dict[str, np.ndarray]:
+    path = os.path.join(filepath, filename) if filename is not None else filepath
+
+    with open(path, "rb") as f:
+        load_descriptor = pickle.load(f)
+
+    return load_descriptor
+
+def merge_descriptor_database(descriptors:Dict[str, np.ndarray], filepath:str, overwrite:bool=False) -> bool:
+    descriptors_db:Dict[str, np.ndarray] = utils.get_descriptor_database(filepath)
+    flag = False
+    for name_descriptor, information in descriptors.items():
+        if (descriptors_db.get(name_descriptor, None) is None) or (overwrite is True):
+            descriptors[name_descriptor] = information
+            save_descriptor_bbdd(descriptors=descriptors, filepath=filepath)
+            flag = True
+
+    return flag
+
+def save_descriptor_bbdd(descriptors: Dict[str, np.ndarray], filepath:str, filename:Optional[str]= None) -> None:
+    if not os.path.exists(filepath):
+        create_descriptor_database(filepath=filepath, filename=filename)
+
+    path = os.path.join(filepath, filename) if filename is not None else filepath
+    with open(path, "wb") as f:
+        pickle.dump(descriptors, f)
 
 
 def get_slices_from_image(path: str, ntiles:int) -> List[Path]:
@@ -128,18 +166,6 @@ def apply_min_max_scaler(img:np.ndarray, **kwargs):
         np.ndarray: The scaled image as a NumPy array.
     """
     return ke.normalize_min_max(img)
-
-def extract_tiles(img: np.ndarray, weight:int, height:int, window_size: int) -> List[np.ndarray]:
-
-    h_pad = (window_size - (height % window_size)) // 2
-    w_pad = (window_size - (weight % window_size)) // 2
-    padding = (h_pad, w_pad)
-
-    img_tiles = extract_tensor_patches(img, window_size=window_size, stride=w_pad, padding=padding)
-
-    return img_tiles
-
-
 
 def read_img(img_path: Path):
     """

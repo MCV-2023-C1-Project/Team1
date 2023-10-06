@@ -1,3 +1,4 @@
+# noinspection PyInterpreter
 from utils import utils
 from methods import Colors_Descriptors as CD
 from preprocessing import pipelines as pipe
@@ -29,33 +30,33 @@ with open("data/qsd1_w1/gt_corresps.pkl", "rb") as f:
     print(file)
 
 
+DESCRIPTORS_PATH = "data/BBDD/color/descriptors.pkl"
+
 
 img_list = sorted(utils.read_bbdd("data/BBDD"))
 
 img_test = str(img_list[277])
-
+descriptors_dict = {}
+dic = utils.get_descriptor_database(DESCRIPTORS_PATH)
 
 query_tiles = utils.get_slices_from_image(img_test, 16)
-dif_colors = pipe.transform_tiles_colorspace(query_tiles, colorspce=utils.convert2lab)
+dif_colors = pipe.transform_tiles_colorspace(query_tiles, colorspace=utils.convert2lab)
 _, U_query, V_Query = pipe.split_nd_tiles_colorspace(dif_colors)
-
-#U_query = U_query.squeeze()
-#V_Query = V_Query.squeeze()
 
 histogram_U, pdf_U_query = CD.get_multi_tile_histogram_descriptor(imgs=U_query, n_bins = 32, return_pdf = True)
 histogram_V, pdf_V_query = CD.get_multi_tile_histogram_descriptor(imgs=V_Query, n_bins = 32, return_pdf = True)
 
-U_descriptor_query = np.zeros(32)
-V_descriptor_query = np.zeros(32)
+U_descriptor_query = np.array([])
+V_descriptor_query = np.array([])
 
 for i,j in zip(pdf_U_query, pdf_V_query):
-    U_descriptor_query += i
-    V_descriptor_query += j
+    U_descriptor_query = np.concatenate((U_descriptor_query, i), axis=-1)
+    V_descriptor_query = np.concatenate((V_descriptor_query, j), axis=-1)
 
 query_descriptor = U_descriptor_query + V_descriptor_query
 
 results_list = []
-
+descriptors_dict = {}
 ## Comparing with all the images
 for idx, img_train in tqdm(enumerate(img_list)):
 
@@ -63,23 +64,28 @@ for idx, img_train in tqdm(enumerate(img_list)):
     dif_colors = pipe.transform_tiles_colorspace(img_tiles, colorspce=utils.convert2lab)
     _, U, V = pipe.split_nd_tiles_colorspace(dif_colors)
 
-    histogram_U, pdf_U = CD.get_multi_tile_histogram_descriptor(imgs=U, n_bins=32, return_pdf=True)
-    histogram_V, pdf_V = CD.get_multi_tile_histogram_descriptor(imgs=V, n_bins=32, return_pdf=True)
+    histogram_U, pdf_U = CD.get_multi_tile_histogram_descriptor(tiles=U, n_bins=32, return_pdf=True)
+    histogram_V, pdf_V = CD.get_multi_tile_histogram_descriptor(tiles=V, n_bins=32, return_pdf=True)
 
-    U_descriptor = np.zeros(32)
-    V_descriptor = np.zeros(32)
+    U_descriptor = np.array([])
+    V_descriptor = np.array([])
 
     for i, j in zip(pdf_U, pdf_V):
-        U_descriptor += i
-        V_descriptor += j
+        U_descriptor = np.concatenate((U_descriptor, i), axis=-1)
+        V_descriptor = np.concatenate((V_descriptor, j), axis=-1)
 
     img_descriptor = U_descriptor + V_descriptor
+
+    descriptors_dict[img_train.name] = img_descriptor
+
 
     distance = 1-jensenshannon(img_descriptor, query_descriptor)
 
     results_list.append((distance, img_train.name))
 
+exit()
 print(results_list)
+
 
 results_sorted = sorted(results_list, key=lambda x: x[0], reverse=True)
 print(results_sorted)
