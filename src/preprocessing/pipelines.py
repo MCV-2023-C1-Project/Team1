@@ -1,10 +1,13 @@
 from utils import utils
 from methods import Colors_Descriptors as CD
+from methods.Background_Removal import *
 
 from tqdm import tqdm
+from PIL import Image
 
 from typing import *
 
+import kornia as K
 import numpy as np
 
 import os
@@ -35,7 +38,14 @@ def generate_K_response(descriptors_bdr:Dict[str, np.ndarray],
 
     return final_responses
 
+def generate_mask_dict(imgs:List[np.ndarray]) -> Dict[str, np.ndarray]:
+    results_dict = {}
 
+    for img_path in imgs:
+        og_img = Image.open(img_path)
+        prediction = find_mask(utils.convert2rgchromaticity(K.tensor_to_image(K.color.rgb_to_linear_rgb(utils.image2tensor(og_img)))))
+        results_dict[img_path.name] = prediction
+    return results_dict
 def generate_grayscale_histogram_descriptors(imgs:List[np.ndarray], **kwargs):
     """
     Generate grayscale histogram descriptors for a list of images.

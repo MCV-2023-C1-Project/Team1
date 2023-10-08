@@ -36,6 +36,9 @@ img_test_list = sorted(utils.read_bbdd("data/qsd1_w1"))
 img_test = str(img_test_list[0])
 img_test_2 = str(img_list[120])
 
+print(img_test)
+exit()
+
 
 query_tiles = utils.get_slices_from_image(img_test, 16)
 dif_colors = utils.transform_tiles_colorspace(query_tiles, colorspace=utils.convert2lab)

@@ -1,3 +1,5 @@
+import os.path
+
 # noinspection PyInterpreter
 from utils import utils
 from preprocessing import pipelines as pipes
@@ -8,7 +10,6 @@ from metrics.retrieval_metrics import *
 
 from toolz.functoolz import pipe
 
-## TODO Crear sa funció de Evaluar i ja estaria sa part sensera des cuadros (retrieval)
 def main():
     METHODS = {"gray_hist":pipes.generate_grayscale_histogram_descriptors,
                "norm-rg":pipes.generate_normalized_rg_histogram_descriptors,
@@ -33,7 +34,6 @@ def main():
     if args.queryfile != False:
         querys_gt = utils.read_pickle(args.queryfile)
         gt = [value[0] for value in querys_gt]
-
         print(querys_gt)
 
     # SOME UTILS
@@ -42,9 +42,11 @@ def main():
 
 
     ## GETTING THE DESCRIPTORS OF OUR BBDD IF THEY ARE COMPUTED
-    filename = "_qsd2_"+f"{args.method}_{args.similarity}"+".pkl"
+    query_dataset_name = os.path.basename((args.querys))
+    filename = f"{query_dataset_name}"+f"{args.method}_{args.similarity}"+".pkl"
     MDESCRIPTOR_PATH = DESCRIPTORS_PATH+"/"+filename
     descriptors_bdr = {}
+
 
     if (args.overwrite is False) and (args.update is False):
         descriptors_bdr, _ = utils.get_descriptor_database(MDESCRIPTOR_PATH)
@@ -59,6 +61,11 @@ def main():
             images_to_upload = sorted([img for img in images_path if img.name not in descriptors_bdr.keys()])
 
         if len(images_to_upload) != 0:
+            if args.background_removal is True:
+                dict_masks = pipes.generate_mask_dict(images_to_upload, )
+
+            print(dict_masks)
+            exit()
             print("STARTING PREPROCESSING THE DATA")
             preprocessed_images = [pipe(img, *PREPROCESSING[args.method]) for img in images_to_upload]
             print("STARTING TO COMPUTE THE DESCRIPTORS OF THE IMAGES")
@@ -91,7 +98,7 @@ def main():
     response = pipes.generate_K_response(descriptors_bdr=descriptors_bdr, descriptors_queries=query_descriptors, sim_func=SIMILARITY[args.similarity], k=int(args.k))
     if args.queryfile != False:
         print(mapk(querys_gt, response, k=5))
-    utils.write_pickle(response, RESULTS+"_qsd2_"+f"{args.method}_{args.similarity}_"+"result.pkl")
+    utils.write_pickle(response, RESULTS+"_qst2_"+f"{args.method}_{args.similarity}_"+"result.pkl")
     #utils.write_pickle(response, RESULTS+"result.pkl")
 
 

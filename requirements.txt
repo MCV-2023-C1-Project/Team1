@@ -1,6 +1,5 @@
 dataframe_image
 docopt
-image_slicer
 imageio
 imutils
 kornia

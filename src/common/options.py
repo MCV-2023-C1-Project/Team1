@@ -26,6 +26,7 @@ class Parser(argparse.ArgumentParser):
         super().add_argument("-s", "--similarity", choices=["cosine", "l1", "euc", "chi", "hellkdis", "jensen", "histint"], required=True, type=str, help= "Methods to compute the similarity")
         super().add_argument("-k", "--k", default=10, help="@K to compute the retrieval")
         super().add_argument("-nt", "--tiles", default=6, help="tiles to compute piramidal slicing")
+        super().add_argument("-br", "--background_removal", action="store_true", help="to enable the background removal")
 
     def parse(self):
         return super().parse_args()

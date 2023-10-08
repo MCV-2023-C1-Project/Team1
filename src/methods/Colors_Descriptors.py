@@ -80,6 +80,7 @@ def get_multi_tile_histogram_descriptor(img: np.array, tiles:int=10, channel:int
     Returns:
         list: List of histograms for each tile.
     """
+
     h,w, channels = img.shape
     feature = np.array([])
     k_size_i = img.shape[0]//tiles
@@ -87,7 +88,7 @@ def get_multi_tile_histogram_descriptor(img: np.array, tiles:int=10, channel:int
     for i in range(0, h - (h%tiles), k_size_i):
         for j in range(0, w - (w%tiles), k_size_j):
             hist, _ = np.histogram(img[i:i+k_size_i, j:j+k_size_j, channel], **kwargs)
-            feature = np.concatenate((feature,(hist/np.sum(hist))[1:]), axis=-1)
+            feature = np.concatenate((feature,(hist/np.sum(hist))), axis=-1)
 
     return feature
 

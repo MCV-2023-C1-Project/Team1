@@ -1,6 +1,5 @@
 from PIL import Image
 import numpy as np
-import kornia as K
 from typing import Dict, Type, List, Tuple
 
 from utils import utils
@@ -10,13 +9,18 @@ from methods import Colors_Descriptors
 def extract_edge_histograms(img: np.ndarray, **kwargs) -> Tuple[List[np.ndarray], List[np.ndarray]]:
     height, width, _ = img.shape
     slice_list = []
+
     slice_list.append(img[2:3, :, :])
     slice_list.append(img[:, 2:3, :])
     slice_list.append(img[height-3:height-2, :, :])
     slice_list.append(img[:, width-3:width-2, :])
+    total_hist = []
+    for i in slice_list:
+        for channel in range(i.shape[2]):
+            hist = Colors_Descriptors.get_multi_tile_histogram_descriptor(i, tiles=1, channel=channel, **kwargs)
+            total_hist.append(hist)
 
-    hist, pdf = Colors_Descriptors.get_multi_tile_histogram_descriptor(slice_list, **kwargs)
-    return hist, pdf
+    return total_hist
 
 
 def get_color_mask(img: np.ndarray, color_val: Tuple[float, float, float], tolerance: float) -> np.ndarray:
@@ -32,7 +36,7 @@ def find_mask(img: np.ndarray) -> np.ndarray:
     min = 0.
     max = 1.
     bin_width = (max - min)/n_bins
-    hist_list, pdf_list = extract_edge_histograms(img, n_bins = n_bins, return_pdf = True, min = min, max = max)
+    hist_list = extract_edge_histograms(img, bins = n_bins, density = True, range=[min, max])
 
     hist_sum_r = np.zeros(hist_list[0].shape)
     hist_sum_g = np.zeros(hist_list[0].shape)
@@ -48,12 +52,3 @@ def find_mask(img: np.ndarray) -> np.ndarray:
     return mask
 
 
-def get_mask_dict(folder: str) -> Dict[str, np.ndarray]:
-    results_dict = {}
-
-    img_list = utils.read_bbdd(folder)
-    for img_path in img_list:
-        og_img = Image.open(img_path)
-        prediction = find_mask(utils.convert2rgchromaticity(K.tensor_to_image(K.color.rgb_to_linear_rgb(utils.image2tensor(og_img)))))
-        results_dict[img_path.name] = prediction
-    return results_dict
