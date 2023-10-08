@@ -17,8 +17,8 @@ def main():
 
     PREPROCESSING = {"gray_hist":[str, utils.read_img , utils.convert2gray],
                     "norm-rg":[str, utils.read_img],
-                    "cummulative":[str, utils.read_img , utils.normalize_min_max, utils.convert2luv],
-                    "multitile":[str, utils.read_img, utils.convert2luv]}
+                    "cummulative":[str, utils.read_img , utils.normalize_min_max, utils.convert2lab],
+                    "multitile":[str, utils.read_img, utils.convert2lab]}
 
     SIMILARITY = {"cosine": cos_sim,
                   "l1": l1norm,
@@ -65,7 +65,7 @@ def main():
 
             if args.method == "multitile":
                 tiles = args.tiles
-                new_descriptors = METHODS[args.method](preprocessed_images, int(tiles), bins=10)
+                new_descriptors = METHODS[args.method](preprocessed_images, int(tiles), bins=16)
 
             else:
                 new_descriptors = METHODS[args.method](preprocessed_images)
@@ -81,7 +81,7 @@ def main():
     preprocessed_images = [pipe(img, *PREPROCESSING[args.method]) for img in QUERYS]
     if args.method == "multitile":
         tiles = args.tiles
-        query_descriptors = METHODS[args.method](preprocessed_images, int(tiles), bins=10)
+        query_descriptors = METHODS[args.method](preprocessed_images, int(tiles), bins=16)
 
     else:
         query_descriptors = METHODS[args.method](preprocessed_images)
@@ -89,7 +89,7 @@ def main():
     response = pipes.generate_K_response(descriptors_bdr=descriptors_bdr, descriptors_queries=query_descriptors, sim_func=SIMILARITY[args.similarity], k=int(args.k))
     print(response)
     if args.queryfile != False:
-        print(mapk(querys_gt, response, k=5))
+        print(mapk(querys_gt, response, k=1))
     #utils.write_pickle(response, RESULTS+f"{args.method}_{args.similarity}_"+"result.pkl")
     utils.write_pickle(response, RESULTS+"result.pkl")
 

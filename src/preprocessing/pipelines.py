@@ -1,7 +1,6 @@
 from utils import utils
 from methods import Colors_Descriptors as CD
 
-from PIL.Image import Image
 from tqdm import tqdm
 
 from typing import *
