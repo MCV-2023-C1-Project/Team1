@@ -61,15 +61,27 @@ def main():
             images_to_upload = sorted([img for img in images_path if img.name not in descriptors_bdr.keys()])
 
         if len(images_to_upload) != 0:
-            if args.background_removal is True:
-                dict_masks = pipes.generate_mask_dict(images_to_upload, )
-
-            print(dict_masks)
-            exit()
             print("STARTING PREPROCESSING THE DATA")
             preprocessed_images = [pipe(img, *PREPROCESSING[args.method]) for img in images_to_upload]
-            print("STARTING TO COMPUTE THE DESCRIPTORS OF THE IMAGES")
+            if args.background_removal is True:
+                dict_masks, check = utils.get_descriptor_database(filepath=DESCRIPTORS_PATH, filename=f"{query_dataset_name}"+"_masks.pkl")
+                if not check:
+                    dict_masks = pipes.generate_mask_dict(images_to_upload, )
+                    utils.save_descriptor_bbdd(dict_masks, filepath=DESCRIPTORS_PATH, filename=f"{query_dataset_name}"+"_masks.pkl")
+                ## TODO AQUI QUIQUIQUIQ !!!!1
+                print("SOLUECIONAR A PARTIR DE AQUI")
+                print(preprocessed_images)
+                print(dict_masks.values())
+                for idx, (image, mask) in enumerate(zip(preprocessed_images, dict_masks.values())):
 
+                    print(mask.shape)
+                    print(image.shape)
+                    preprocessed_images[idx] = (image * mask.unsuqueeze(-1))
+                    exit()
+
+
+                exit()
+            print("STARTING TO COMPUTE THE DESCRIPTORS OF THE IMAGES")
             if args.method == "multitile":
                 tiles = args.tiles
                 new_descriptors = METHODS[args.method](preprocessed_images, int(tiles), bins=16)
