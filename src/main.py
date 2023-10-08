@@ -1,101 +1,104 @@
 # noinspection PyInterpreter
 from utils import utils
-from methods import Colors_Descriptors as CD
-from preprocessing import pipelines as pipe
+from preprocessing import pipelines as pipes
+from common.options import Parser
+from common.config import *
+from metrics.retrieval_distances import *
+from metrics.retrieval_metrics import *
 
-from math import ceil
-from image_slicer import slice
-from scipy.spatial.distance import jensenshannon
-from tqdm import tqdm
+from toolz.functoolz import pipe
 
-import matplotlib.pyplot as plt
+## TODO Crear sa funció de Evaluar i ja estaria sa part sensera des cuadros (retrieval)
+def main():
+    METHODS = {"gray_hist":pipes.generate_grayscale_histogram_descriptors,
+               "norm-rg":pipes.generate_normalized_rg_histogram_descriptors,
+               "cummulative":pipes.generate_cummulative_histogram_descriptors,
+               "multitile":pipes.generate_multi_tile_histogram_descriptors}
 
+    PREPROCESSING = {"gray_hist":[str, utils.read_img , utils.convert2gray],
+                    "norm-rg":[str, utils.read_img],
+                    "cummulative":[str, utils.read_img , utils.normalize_min_max, utils.convert2luv],
+                    "multitile":[str, utils.read_img, utils.convert2luv]}
 
-import kornia as K
-import kornia.enhance as ke
-import numpy as np
-import cv2
+    SIMILARITY = {"cosine": cos_sim,
+                  "l1": l1norm,
+                  "euc": euclDis,
+                  "chi": chi2_distance,
+                  "hellkdis":hellkdis,
+                  "jensen": jensensim,
+                  "histint": histogram_intersection
+                  }
+    args = Parser().parse()
+    ## Reading querys
+    if args.queryfile != False:
+        querys_gt = utils.read_pickle(args.queryfile)
+        gt = [value[0] for value in querys_gt]
 
-import pickle as pkl
+        print(querys_gt)
 
-
-
-
-import torch
-import time
-
-
-with open("data/qsd1_w1/gt_corresps.pkl", "rb") as f:
-    file = pkl.load(f)
-    print(file)
-
-
-DESCRIPTORS_PATH = "data/BBDD/color/descriptors.pkl"
-
-
-img_list = sorted(utils.read_bbdd("data/BBDD"))
-
-img_test = str(img_list[277])
-descriptors_dict = {}
-dic = utils.get_descriptor_database(DESCRIPTORS_PATH)
-
-query_tiles = utils.get_slices_from_image(img_test, 16)
-dif_colors = pipe.transform_tiles_colorspace(query_tiles, colorspace=utils.convert2lab)
-_, U_query, V_Query = pipe.split_nd_tiles_colorspace(dif_colors)
-
-histogram_U, pdf_U_query = CD.get_multi_tile_histogram_descriptor(imgs=U_query, n_bins = 32, return_pdf = True)
-histogram_V, pdf_V_query = CD.get_multi_tile_histogram_descriptor(imgs=V_Query, n_bins = 32, return_pdf = True)
-
-U_descriptor_query = np.array([])
-V_descriptor_query = np.array([])
-
-for i,j in zip(pdf_U_query, pdf_V_query):
-    U_descriptor_query = np.concatenate((U_descriptor_query, i), axis=-1)
-    V_descriptor_query = np.concatenate((V_descriptor_query, j), axis=-1)
-
-query_descriptor = U_descriptor_query + V_descriptor_query
-
-results_list = []
-descriptors_dict = {}
-## Comparing with all the images
-for idx, img_train in tqdm(enumerate(img_list)):
-
-    img_tiles = utils.get_slices_from_image(img_train, 16)
-    dif_colors = pipe.transform_tiles_colorspace(img_tiles, colorspce=utils.convert2lab)
-    _, U, V = pipe.split_nd_tiles_colorspace(dif_colors)
-
-    histogram_U, pdf_U = CD.get_multi_tile_histogram_descriptor(tiles=U, n_bins=32, return_pdf=True)
-    histogram_V, pdf_V = CD.get_multi_tile_histogram_descriptor(tiles=V, n_bins=32, return_pdf=True)
-
-    U_descriptor = np.array([])
-    V_descriptor = np.array([])
-
-    for i, j in zip(pdf_U, pdf_V):
-        U_descriptor = np.concatenate((U_descriptor, i), axis=-1)
-        V_descriptor = np.concatenate((V_descriptor, j), axis=-1)
-
-    img_descriptor = U_descriptor + V_descriptor
-
-    descriptors_dict[img_train.name] = img_descriptor
+    # SOME UTILS
+    QUERYS = sorted(utils.read_bbdd(args.querys))
+    images_path = sorted(utils.read_bbdd(BBDD))
 
 
-    distance = 1-jensenshannon(img_descriptor, query_descriptor)
+    ## GETTING THE DESCRIPTORS OF OUR BBDD IF THEY ARE COMPUTED
+    filename = args.method+".pkl"
+    MDESCRIPTOR_PATH = DESCRIPTORS_PATH+f"/{filename}"
+    descriptors_bdr = {}
 
-    results_list.append((distance, img_train.name))
+    if (args.overwrite is False) and (args.update is False):
+        descriptors_bdr, _ = utils.get_descriptor_database(MDESCRIPTOR_PATH)
 
+    else:
+        if args.overwrite is True:
+            images_to_upload = sorted(utils.read_bbdd(BBDD))
+
+        ## In this lines of code we are checking if there is a new image in the BBDD
+        elif args.update is True:
+            descriptors_bdr, _ = utils.get_descriptor_database(MDESCRIPTOR_PATH)
+            images_to_upload = sorted([img for img in images_path if img.name not in descriptors_bdr.keys()])
+
+        if len(images_to_upload) != 0:
+            print("STARTING PREPROCESSING THE DATA")
+            preprocessed_images = [pipe(img, *PREPROCESSING[args.method]) for img in images_to_upload]
+            print("STARTING TO COMPUTE THE DESCRIPTORS OF THE IMAGES")
+
+            if args.method == "multitile":
+                tiles = args.tiles
+                new_descriptors = METHODS[args.method](preprocessed_images, int(tiles), bins=10)
+
+            else:
+                new_descriptors = METHODS[args.method](preprocessed_images)
+
+
+            for idx, im in enumerate(images_to_upload):
+                descriptors_bdr[im.name] = new_descriptors[idx]
+
+
+        utils.save_descriptor_bbdd(descriptors_bdr, filepath=DESCRIPTORS_PATH, filename=filename)
+
+    ## Applying the process to the queries
+    preprocessed_images = [pipe(img, *PREPROCESSING[args.method]) for img in QUERYS]
+    if args.method == "multitile":
+        tiles = args.tiles
+        query_descriptors = METHODS[args.method](preprocessed_images, int(tiles), bins=10)
+
+    else:
+        query_descriptors = METHODS[args.method](preprocessed_images)
+
+    response = pipes.generate_K_response(descriptors_bdr=descriptors_bdr, descriptors_queries=query_descriptors, sim_func=SIMILARITY[args.similarity], k=int(args.k))
+    print(response)
+    if args.queryfile != False:
+        print(mapk(querys_gt, response, k=5))
+    #utils.write_pickle(response, RESULTS+f"{args.method}_{args.similarity}_"+"result.pkl")
+    utils.write_pickle(response, RESULTS+"result.pkl")
+
+
+
+    ## Starting the retrieval
+main()
 exit()
-print(results_list)
 
-
-results_sorted = sorted(results_list, key=lambda x: x[0], reverse=True)
-print(results_sorted)
-
-with open("results.txt", "a") as res:
-    print("Writing results")
-    res.write("Testing on img 170:\n")
-    res.write("The Top 10 imatges are:\n")
-    for resul in results_sorted[:10]:
-        res.write(f"{resul}\n")
 
 
 

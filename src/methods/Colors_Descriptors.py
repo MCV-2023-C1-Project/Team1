@@ -1,4 +1,5 @@
 from  utils import utils
+from common.config import *
 
 from pathlib import Path
 from PIL.Image import Image
@@ -8,30 +9,101 @@ import kornia as k
 import kornia.enhance as ke
 import numpy as np
 
-def get_multi_tile_histogram_descriptor(tiles: List[np.array], **kwargs):
+
+def get_grayscale_histogram_descriptor(img: np.ndarray, **kwargs):
     """
-    Compute histogram and probability density function (PDF) descriptors for multiple images.
+    Compute a grayscale histogram descriptor for the given image.
 
     Parameters:
-        imgs (List[np.array]): A list of NumPy arrays representing images.
-        **kwargs: Additional keyword arguments for customization.
+        img (np.ndarray): Input grayscale image.
+        **kwargs: Additional keyword arguments for ke.image_histogram2d.
 
     Returns:
-        Tuple[List[np.array], List[np.array]]: A tuple containing histogram and PDF descriptors.
-            The histogram descriptor array and PDF descriptor array for the input images.
+        np.ndarray: Grayscale histogram descriptor feature.
     """
-    histogram_descriptor_array = []
-    pdf_descriptor_array = []
-    for img in tiles:
-        histogram, pdf = get_histogram_descriptor(img, **kwargs)
-        histogram_descriptor_array += list(histogram.numpy())
-        pdf_descriptor_array += list(pdf.numpy())
+    feature, pdf =   ke.image_histogram2d(img, **kwargs)
 
-    return histogram_descriptor_array, pdf_descriptor_array
+    return feature
 
+def get_normalized_rg_histogram_descriptor(img: np.ndarray, **kwargs):
+    """
+    Compute a normalized red-green (RG) histogram descriptor for the given image.
+
+    Parameters:
+        img (np.ndarray): Input image in RGB format.
+        **kwargs: Additional keyword arguments for ke.image_histogram2d.
+
+    Returns:
+        np.ndarray: Concatenated normalized red and green histogram features.
+    """
+    R_norm = (img[:,:,0]/img.sum(axis=2))
+    G_norm = (img[:,:,1]/img.sum(axis=2))
+
+    R_feature, _ = np.histogram(R_norm, range=[0.0, 256.0])
+    G_feature, _ = np.histogram(G_norm, range=[0.0, 256.0])
+
+    R_feature = R_feature / np.sum(R_feature)
+    G_feature =  G_feature / np.sum(G_feature)
+
+    return np.concatenate((R_feature, G_feature), axis=-1)
+
+def get_cummulative_histogram_descriptor(img: np.ndarray,channels:list=[1,2], **kwargs):
+    """
+    Compute a cumulative histogram descriptor for the given image.
+
+    Parameters:
+        img (np.ndarray): Input image.
+        channels (list): List of channels to compute the cumulative histogram for. Default is [1, 2].
+        **kwargs: Additional keyword arguments for np.histogram.
+
+    Returns:
+        np.ndarray: Cumulative histogram descriptor feature.
+    """
+    feature = np.array([])
+    for c in channels:
+        hist, pdf = np.histogram(img[:,:,c], **kwargs)
+        cumulative = np.cumsum(hist)
+        feature = np.concatenate((feature, cumulative), axis=-1)
+
+    return feature
+
+def get_multi_tile_histogram_descriptor(img: np.array, tiles:int=10, channel:int=1,  **kwargs):
+    """
+    Compute a multi-tile histogram descriptor for the given image.
+
+    Parameters:
+        img (np.array): Input image.
+        tiles (int): Number of tiles to divide the image into. Default is 10.
+        channel (int): Channel to compute the histogram for. Default is 1.
+        **kwargs: Additional keyword arguments for np.histogram.
+
+    Returns:
+        list: List of histograms for each tile.
+    """
+    h,w, channels = img.shape
+    feature = np.array([])
+    k_size_i = img.shape[0]//tiles
+    k_size_j = img.shape[1]//tiles
+    for i in range(0, h - (h%tiles), k_size_i):
+        for j in range(0, w - (w%tiles), k_size_j):
+            hist, _ = np.histogram(img[i:i+k_size_i, j:j+k_size_j, channel], **kwargs)
+            feature = np.concatenate((feature,(hist/np.sum(hist))[1:]), axis=-1)
+
+    return feature
 
 def get_histogram_descriptor(img_array: np.array, **kwargs):
+    """
+    Compute a histogram descriptor for the given image array.
+
+    Parameters:
+        img_array (np.array): Input image array.
+        **kwargs: Additional keyword arguments for ke.image_histogram2d.
+
+    Returns:
+        np.ndarray: Histogram and probability density function (pdf).
+    """
     im = utils.image2tensor(img_array)
     histogram, pdf = ke.image_histogram2d(im, **kwargs)
 
     return histogram, pdf
+
