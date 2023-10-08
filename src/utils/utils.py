@@ -268,6 +268,19 @@ def convert2lab(img: np.ndarray) -> np.ndarray:
     """
     return K.tensor_to_image(K.color.rgb_to_lab(img))
 
+def convert2rgchromaticity(img: np.ndarray) -> np.ndarray:
+    """
+    Convert a linear RGB image to rg chromaticity color space.
+
+    Parameters:
+        img (np.ndarray): The input linear RGB image as a NumPy array.
+
+    Returns:
+        np.ndarray: The image in rg chromaticity color space as a NumPy array.
+    """
+    sum = img[:,:,0] + img[:,:,1] + img[:,:,2]
+    return img / sum[:, :, None]
+
 def normalize_min_max(x: torch.Tensor, min_val: float = 0.0, max_val: float = 1.0, eps: float = 1e-6) -> torch.Tensor:
     r"""Normalise an image/video tensor by MinMax and re-scales the value between a range.
 
