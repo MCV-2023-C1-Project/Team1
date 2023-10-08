@@ -68,19 +68,15 @@ def main():
                 if not check:
                     dict_masks = pipes.generate_mask_dict(images_to_upload, )
                     utils.save_descriptor_bbdd(dict_masks, filepath=DESCRIPTORS_PATH, filename=f"{query_dataset_name}"+"_masks.pkl")
-                ## TODO AQUI QUIQUIQUIQ !!!!1
-                print("SOLUECIONAR A PARTIR DE AQUI")
-                print(preprocessed_images)
-                print(dict_masks.values())
+                #print(preprocessed_images)
+                #print(dict_masks.values())
                 for idx, (image, mask) in enumerate(zip(preprocessed_images, dict_masks.values())):
 
-                    print(mask.shape)
-                    print(image.shape)
-                    preprocessed_images[idx] = (image * mask.unsuqueeze(-1))
-                    exit()
+                    #print(mask.shape)
+                    #print(image.shape)
+                    preprocessed_images[idx] = (image * mask[:, :, None])
 
 
-                exit()
             print("STARTING TO COMPUTE THE DESCRIPTORS OF THE IMAGES")
             if args.method == "multitile":
                 tiles = args.tiles
@@ -109,7 +105,7 @@ def main():
 
     response = pipes.generate_K_response(descriptors_bdr=descriptors_bdr, descriptors_queries=query_descriptors, sim_func=SIMILARITY[args.similarity], k=int(args.k))
     if args.queryfile != False:
-        print(mapk(querys_gt, response, k=5))
+        print(mapk(querys_gt, response, k=1))
     utils.write_pickle(response, RESULTS+"_qst2_"+f"{args.method}_{args.similarity}_"+"result.pkl")
     #utils.write_pickle(response, RESULTS+"result.pkl")
 
