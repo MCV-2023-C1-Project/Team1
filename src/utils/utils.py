@@ -1,27 +1,40 @@
 ## from ....
 from utils import utils
 from typing import *
-from kornia.contrib import (
-    CombineTensorPatches,
-    ExtractTensorPatches,
-    combine_tensor_patches,
-    extract_tensor_patches,
-)
+
 
 
 from pathlib import  Path
 from PIL.Image import Image
+from matplotlib import colors
 
 
 import numpy as np
 import kornia as K
-import kornia.enhance as ke
 import image_slicer as slicer
 
 import pickle
-import imutils
 import os
 import torch
+import matplotlib.pyplot as plt
+
+
+def RG_Chroma_plotter(red,green):
+    p_color = [(r, g, 1-r-g) for r,g in
+               zip(red.flatten(),green.flatten())]
+    norm = colors.Normalize(vmin=0,vmax=1.)
+    norm.autoscale(p_color)
+    p_color = norm(p_color).tolist()
+    fig = plt.figure(figsize=(10, 7), dpi=100)
+    ax = fig.add_subplot(111)
+    ax.scatter(red.flatten(),
+                green.flatten(),
+                c = p_color, alpha = 0.40)
+    ax.set_xlabel('Red Channel', fontsize = 20)
+    ax.set_ylabel('Green Channel', fontsize = 20)
+    ax.set_xlim([0, 1])
+    ax.set_ylim([0, 1])
+    plt.show()
 
 
 def retriev_image(descriptors_bdr:Dict[str, np.ndarray], compare_descriptor: np.ndarray, distance:Callable) -> List[Tuple[float, str]]:

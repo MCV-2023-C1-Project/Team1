@@ -42,8 +42,8 @@ def main():
 
 
     ## GETTING THE DESCRIPTORS OF OUR BBDD IF THEY ARE COMPUTED
-    filename = args.method+".pkl"
-    MDESCRIPTOR_PATH = DESCRIPTORS_PATH+f"/{filename}"
+    filename = "_qsd2_"+f"{args.method}_{args.similarity}"+".pkl"
+    MDESCRIPTOR_PATH = DESCRIPTORS_PATH+"/"+filename
     descriptors_bdr = {}
 
     if (args.overwrite is False) and (args.update is False):
@@ -86,12 +86,13 @@ def main():
     else:
         query_descriptors = METHODS[args.method](preprocessed_images)
 
+
+
     response = pipes.generate_K_response(descriptors_bdr=descriptors_bdr, descriptors_queries=query_descriptors, sim_func=SIMILARITY[args.similarity], k=int(args.k))
-    print(response)
     if args.queryfile != False:
-        print(mapk(querys_gt, response, k=1))
-    #utils.write_pickle(response, RESULTS+f"{args.method}_{args.similarity}_"+"result.pkl")
-    utils.write_pickle(response, RESULTS+"result.pkl")
+        print(mapk(querys_gt, response, k=5))
+    utils.write_pickle(response, RESULTS+"_qsd2_"+f"{args.method}_{args.similarity}_"+"result.pkl")
+    #utils.write_pickle(response, RESULTS+"result.pkl")
 
 
 

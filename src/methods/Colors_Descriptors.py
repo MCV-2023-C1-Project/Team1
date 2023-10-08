@@ -36,14 +36,14 @@ def get_normalized_rg_histogram_descriptor(img: np.ndarray, **kwargs):
     Returns:
         np.ndarray: Concatenated normalized red and green histogram features.
     """
-    R_norm = (img[:,:,0]/img.sum(axis=2))
-    G_norm = (img[:,:,1]/img.sum(axis=2))
 
-    R_feature, _ = np.histogram(R_norm, range=[0.0, 256.0])
-    G_feature, _ = np.histogram(G_norm, range=[0.0, 256.0])
+    R_norm = (img[0,:,:]/img.sum(axis=0))
+    G_norm = (img[1,:,:]/img.sum(axis=0))
 
-    R_feature = R_feature / np.sum(R_feature)
-    G_feature =  G_feature / np.sum(G_feature)
+    hist_r, _ = np.histogram(R_norm, range=[0.0, 1.0])
+    hist_g, _ = np.histogram(G_norm, range=[0.0, 1.0])
+    R_feature = hist_r / np.sum(hist_r)
+    G_feature =  hist_g / np.sum(hist_g)
 
     return np.concatenate((R_feature, G_feature), axis=-1)
 

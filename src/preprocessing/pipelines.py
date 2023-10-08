@@ -28,6 +28,7 @@ def generate_K_response(descriptors_bdr:Dict[str, np.ndarray],
     """
 
     final_responses = [[] for _ in range(len(descriptors_queries))]
+
     for idx, descriptor in enumerate((descriptors_queries.values())):
         scoring_list = (utils.retriev_image(descriptors_bdr, descriptor, distance=sim_func))
         final_responses[idx] += [ind[1] for ind in scoring_list[:k]]
@@ -68,7 +69,6 @@ def generate_normalized_rg_histogram_descriptors(imgs:List[np.ndarray], **kwargs
     for idx, img in tqdm(enumerate(imgs)):
         feature = CD.get_normalized_rg_histogram_descriptor(img.squeeze(), **kwargs)
         descriptors[idx] = feature
-
     return descriptors
 
 
