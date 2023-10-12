@@ -8,18 +8,24 @@ from common.config import *
 from metrics.retrieval_distances import *
 from metrics.retrieval_metrics import *
 
+from PIL import Image
+
 from toolz.functoolz import pipe
 
 def main():
     METHODS = {"gray_hist":pipes.generate_grayscale_histogram_descriptors,
                "norm-rg":pipes.generate_normalized_rg_histogram_descriptors,
                "cummulative":pipes.generate_cummulative_histogram_descriptors,
-               "multitile":pipes.generate_multi_tile_histogram_descriptors}
+               "multitile":pipes.generate_1d_multi_tile_histogram_descriptors,
+               "multiresolution": pipes.generate_multiresolution_histogram_descriptor,
+               "pyramidal":pipes.generate_pyramidal_histogram_descriptor}
 
     PREPROCESSING = {"gray_hist":[str, utils.read_img , utils.convert2gray],
                     "norm-rg":[str, utils.read_img],
                     "cummulative":[str, utils.read_img , utils.normalize_min_max, utils.convert2lab],
-                    "multitile":[str, utils.read_img, utils.convert2lab]}
+                    "multitile":[str, utils.read_img, utils.convert2lab],
+                     "pyramidal":[str, utils.read_img, utils.convert2lab],
+                     "multiresolution":[str, utils.read_img, utils.convert2lab]}
 
     SIMILARITY = {"cosine": cos_sim,
                   "l1": l1norm,
@@ -43,7 +49,7 @@ def main():
 
     ## GETTING THE DESCRIPTORS OF OUR BBDD IF THEY ARE COMPUTED
     query_dataset_name = os.path.basename((args.querys))
-    filename = f"{query_dataset_name}"+f"{args.method}_{args.similarity}"+".pkl"
+    filename = f"{query_dataset_name}_"+f"{args.method}_{args.similarity}"+".pkl"
     MDESCRIPTOR_PATH = DESCRIPTORS_PATH+"/"+filename
     descriptors_bdr = {}
 
@@ -65,8 +71,10 @@ def main():
             preprocessed_images = [pipe(img, *PREPROCESSING[args.method]) for img in images_to_upload]
             if args.background_removal is True:
                 dict_masks, check = utils.get_descriptor_database(filepath=DESCRIPTORS_PATH, filename=f"{query_dataset_name}"+"_masks.pkl")
+
+                print(check)
                 if not check:
-                    dict_masks = pipes.generate_mask_dict(images_to_upload, )
+                    dict_masks = pipes.generate_mask_dict(images_to_upload)
                     utils.save_descriptor_bbdd(dict_masks, filepath=DESCRIPTORS_PATH, filename=f"{query_dataset_name}"+"_masks.pkl")
                 #print(preprocessed_images)
                 #print(dict_masks.values())
@@ -74,29 +82,51 @@ def main():
 
                     #print(mask.shape)
                     #print(image.shape)
-                    preprocessed_images[idx] = (image * mask[:, :, None])
+                    preprocessed_images[idx] = (image * mask[None, :, :])
 
 
             print("STARTING TO COMPUTE THE DESCRIPTORS OF THE IMAGES")
-            if args.method == "multitile":
+            if args.method in ["multitile", "multiresolution"]:
                 tiles = args.tiles
-                new_descriptors = METHODS[args.method](preprocessed_images, int(tiles), bins=16)
+                new_descriptors = METHODS[args.method](preprocessed_images, int(tiles))
+
+            elif args.method == "pyramidal":
+                new_descriptors = METHODS[args.method](preprocessed_images, steps=int(args.steps))
+
 
             else:
-                new_descriptors = METHODS[args.method](preprocessed_images)
+                new_descriptors = METHODS[args.method](preprocessed_images, density=True)
 
 
-            for idx, im in enumerate(images_to_upload):
-                descriptors_bdr[im.name] = new_descriptors[idx]
+        for idx, im in enumerate(images_to_upload):
+            descriptors_bdr[im.name] = new_descriptors[idx]
 
+        print(descriptors_bdr)
 
-        utils.save_descriptor_bbdd(descriptors_bdr, filepath=DESCRIPTORS_PATH, filename=filename)
+        utils.save_descriptor_bbdd(descriptors_bdr, filepath=MDESCRIPTOR_PATH)
 
     ## Applying the process to the queries
     preprocessed_images = [pipe(img, *PREPROCESSING[args.method]) for img in QUERYS]
-    if args.method == "multitile":
+    if args.background_removal is True:
+        dict_masks_test = pipes.generate_mask_dict(QUERYS)
+        utils.save_descriptor_bbdd(dict_masks, filepath=DESCRIPTORS_PATH,
+                                   filename=f"{query_dataset_name}" + "_masks.pkl")
+
+        for name, array in dict_masks_test.items():
+            new_name = name.split(".")[0]+".png"
+            Image.fromarray((dict_masks_test[name]*255).astype(np.uint8)).save(new_name)
+
+        for idx, (image, mask) in enumerate(zip(preprocessed_images, dict_masks_test.values())):
+            # print(mask.shape)
+            # print(image.shape)
+            preprocessed_images[idx] = (image * mask[None, :, :])
+
+    if args.method in ["multitile", "multiresolution"]:
         tiles = args.tiles
-        query_descriptors = METHODS[args.method](preprocessed_images, int(tiles), bins=16)
+        query_descriptors = METHODS[args.method](preprocessed_images, int(tiles))
+
+    elif args.method == "pyramidal":
+        query_descriptors = METHODS[args.method](preprocessed_images, steps=int(args.steps))
 
     else:
         query_descriptors = METHODS[args.method](preprocessed_images)
@@ -106,8 +136,10 @@ def main():
     response = pipes.generate_K_response(descriptors_bdr=descriptors_bdr, descriptors_queries=query_descriptors, sim_func=SIMILARITY[args.similarity], k=int(args.k))
     if args.queryfile != False:
         print(mapk(querys_gt, response, k=1))
-    utils.write_pickle(response, RESULTS+"_qst2_"+f"{args.method}_{args.similarity}_"+"result.pkl")
-    #utils.write_pickle(response, RESULTS+"result.pkl")
+
+    print(response)
+    #utils.write_pickle(response, RESULTS+"_qst2_"+f"{args.method}_{args.similarity}_"+"result.pkl")
+    utils.write_pickle(response, RESULTS+"results.pkl")
 
 
 

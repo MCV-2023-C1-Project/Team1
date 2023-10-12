@@ -101,7 +101,48 @@ def generate_cummulative_histogram_descriptors(imgs: np.ndarray, channels:list =
 
     return descriptors
 
-def generate_multi_tile_histogram_descriptors(imgs:List[np.ndarray], tiles:int=10, channels:list=[1,2], **kwargs):
+def generate_pyramidal_histogram_descriptor(imgs:List[np.ndarray], steps:int=5, **kwargs):
+    """
+    Generate pyramidal histogram descriptors for a list of images.
+
+    Parameters:
+        imgs (List[np.ndarray]): List of input images.
+        steps (int): How big is the pyramidal representation (2**steps + 2**steps-1 ... ... ... ).
+        **kwargs: Additional keyword arguments for CD.get_multi_tile_histogram_descriptor.
+
+    Returns:
+        Dict[int, np.ndarray]: Dictionary of the pyramidal histogram descriptor for each image.
+    """
+    descriptors = {}
+    for idx, img in tqdm(enumerate(imgs)):
+        descriptors[idx] = np.array([])
+        feature = CD.get_piramidal_histogram_descriptor(img, steps, **kwargs)
+        descriptors[idx] = np.concatenate((descriptors[idx], feature.squeeze()), axis=-1)
+
+    return descriptors
+
+
+def generate_multiresolution_histogram_descriptor(imgs:List[np.ndarray], tiles:int=6, **kwargs):
+    """
+    Generate multiresolution histogram descriptors for a list of images.
+
+    Parameters:
+        imgs (List[np.ndarray]): List of input images.
+        tiles (int): Number of tiles to divide the image into. Default is 10.
+        **kwargs: Additional keyword arguments for CD.get_multi_tile_histogram_descriptor.
+
+    Returns:
+        Dict[int, np.ndarray]: Dictionary of multi-tile histogram descriptors for each image.
+    """
+    descriptors = {}
+    for idx, img in tqdm(enumerate(imgs)):
+        descriptors[idx] = np.array([])
+        feature = CD.get_multi_tile_histogram_decriptor(img, tiles, **kwargs)
+        descriptors[idx] = np.concatenate((descriptors[idx], feature.squeeze()), axis=-1)
+
+    return descriptors
+
+def generate_1d_multi_tile_histogram_descriptors(imgs:List[np.ndarray], tiles:int=10, channels:list=[1,2], **kwargs):
     """
     Generate multi-tile histogram descriptors for a list of images.
 
@@ -118,7 +159,7 @@ def generate_multi_tile_histogram_descriptors(imgs:List[np.ndarray], tiles:int=1
     for idx, img in tqdm(enumerate(imgs)):
         descriptors[idx] = np.array([])
         for channel in channels:
-            feature = CD.get_multi_tile_histogram_descriptor(img, tiles, channel, **kwargs)
+            feature = CD.get_channel_multi_tile_histogram_descriptor(img, tiles, channel, **kwargs)
             descriptors[idx] = np.concatenate((descriptors[idx], feature.squeeze()), axis=-1)
 
     return descriptors

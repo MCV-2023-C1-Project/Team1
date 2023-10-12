@@ -11,7 +11,7 @@ from matplotlib import colors
 
 import numpy as np
 import kornia as K
-import image_slicer as slicer
+
 
 import pickle
 import os
@@ -79,6 +79,8 @@ def read_pickle(filepath:str) -> Any:
     """
     with open(filepath, "rb") as file:
         load_file = pickle.load(file)
+
+
 
     return load_file
 
@@ -174,6 +176,7 @@ def save_descriptor_bbdd(descriptors: Dict[str, np.ndarray], filepath:str, filen
         create_descriptor_database(filepath=filepath, filename=filename)
 
     path = os.path.join(filepath, filename) if filename is not None else filepath
+    print(descriptors)
     write_pickle(descriptors, path)
 
 

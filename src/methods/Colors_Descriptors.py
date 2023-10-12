@@ -67,7 +67,41 @@ def get_cummulative_histogram_descriptor(img: np.ndarray,channels:list=[1,2], **
 
     return feature
 
-def get_multi_tile_histogram_descriptor(img: np.array, tiles:int=10, channel:int=1,  **kwargs):
+
+def get_piramidal_histogram_descriptor(img: np.array, steps:int=5, **kwargs):
+    histogram_descriptor = np.array([])
+    for s in range(steps):
+        tiles = 2**s
+        feature_s = get_multi_tile_histogram_decriptor(img=img, tiles=tiles, **kwargs)
+        histogram_descriptor = np.concatenate((histogram_descriptor, feature_s), axis=-1)
+
+    return histogram_descriptor
+def get_multi_tile_histogram_decriptor(img: np.array, tiles:int=10, **kwargs):
+    """
+    Compute a multi-tile histogram descriptor for the given image.
+
+    Parameters:
+        img (np.array): Input image.
+        tiles (int): Number of tiles to divide the image into. Default is 10.
+        channel (int): Channel to compute the histogram for. Default is 1.
+        **kwargs: Additional keyword arguments for np.histogram.
+
+    Returns:
+        list: List of histograms for each tile.
+    """
+
+    h,w, channels = img.shape
+    feature = np.array([])
+    k_size_i = img.shape[0]//tiles
+    k_size_j = img.shape[1]//tiles
+    for i in range(0, h - (h%tiles), k_size_i):
+        for j in range(0, w - (w%tiles), k_size_j):
+            hist, _ = np.histogram(img[i:i+k_size_i, j:j+k_size_j,:[1,2]], **kwargs)
+            feature = np.concatenate((feature,(hist/np.sum(hist))), axis=-1)
+
+    return feature
+
+def get_channel_multi_tile_histogram_descriptor(img: np.array, tiles:int=10, channel:int=1,  **kwargs):
     """
     Compute a multi-tile histogram descriptor for the given image.
 

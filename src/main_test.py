@@ -18,6 +18,7 @@ import cv2
 
 import pickle as pkl
 
+import seaborn as sns
 
 
 import torch
@@ -33,10 +34,17 @@ with open("data/qsd1_w1/gt_corresps.pkl", "rb") as f:
 img_list = sorted(utils.read_bbdd("data/BBDD"))
 img_test_list = sorted(utils.read_bbdd("data/qsd1_w1"))
 
-img_test = str(img_test_list[0])
-img_test_2 = str(img_list[120])
+img_test = str(img_list[282])
 
 print(img_test)
+image = utils.convert2rgchromaticity(utils.read_img(img_test))
+print(image.shape)
+hist, _ = np.histogram(image[0,:,:], density=True, bins=256)
+hist = hist/np.sum(hist)
+print(len(hist))
+print(len(_))
+sns.lineplot(x=_[1:], y=hist)
+plt.show()
 exit()
 
 

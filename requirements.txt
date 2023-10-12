@@ -5,7 +5,6 @@ imutils
 kornia
 kornia_rs
 matplotlib
-ml_metrics
 numpy
 opencv_contrib_python
 opencv_python
