@@ -72,11 +72,11 @@ def get_piramidal_histogram_descriptor(img: np.array, steps:int=5, **kwargs):
     histogram_descriptor = np.array([])
     for s in range(steps):
         tiles = 2**s
-        feature_s = get_multi_tile_histogram_decriptor(img=img, tiles=tiles, **kwargs)
+        feature_s = get_multi_tile_histogram_descriptor(img=img, tiles=tiles, **kwargs)
         histogram_descriptor = np.concatenate((histogram_descriptor, feature_s), axis=-1)
 
     return histogram_descriptor
-def get_multi_tile_histogram_decriptor(img: np.array, tiles:int=10, **kwargs):
+def get_multi_tile_histogram_descriptor(img: np.array, tiles:int=10, **kwargs):
     """
     Compute a multi-tile histogram descriptor for the given image.
 

@@ -27,6 +27,7 @@ class Parser(argparse.ArgumentParser):
         super().add_argument("-k", "--k", default=10, help="@K to compute the retrieval")
         super().add_argument("-nt", "--tiles", default=6, help="tiles to compute piramidal slicing")
         super().add_argument("-br", "--background_removal", action="store_true", help="to enable the background removal")
+        super().add_argument("-ma", "--mask_folder", help="folder with precomputed masks (disables background removal)")
         super().add_argument("-st", "--steps", default=3, help="Steps for the pyramidal representation")
 
     def parse(self):

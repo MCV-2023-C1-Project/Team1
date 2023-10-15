@@ -5,7 +5,7 @@ from typing import *
 
 
 from pathlib import  Path
-from PIL.Image import Image
+from PIL import Image
 from matplotlib import colors
 
 
@@ -224,7 +224,7 @@ def read_bbdd(path: Type[str]) -> List[Type[Path]]:
     return img_list
 
 
-def image2tensor(img: Image) -> np.ndarray:
+def image2tensor(img: Image.Image) -> np.ndarray:
 
     """
     Convert an image to a tensor.
@@ -345,7 +345,7 @@ def read_img(img_path: Path):
     #return Image.open(img_path)
 
 
-def transform_tiles_colorspace(tiles: List[Image], colorspace: Callable) -> List[np.ndarray]:
+def transform_tiles_colorspace(tiles: List[Image.Image], colorspace: Callable) -> List[np.ndarray]:
     """
     Transform tiles' colorspace using the specified colorspace transformation function.
 
@@ -406,7 +406,12 @@ def split_image_colorspace(image: np.ndarray) -> Tuple[np.ndarray]:
 # channel_arrays will contain the 3 arrays representing individual color channels
 
 
+def create_mask_dict_from_files(folder: str):
+    mask_dict = {}
 
-
-
-
+    for file in Path(folder).glob('*.png'):
+        mask = np.array(Image.open(file))
+        mask_dict[file.with_suffix('.jpg').name] = mask
+    
+    print(mask_dict)
+    return mask_dict

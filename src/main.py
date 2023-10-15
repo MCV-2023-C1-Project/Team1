@@ -67,6 +67,7 @@ def main():
             images_to_upload = sorted([img for img in images_path if img.name not in descriptors_bdr.keys()])
 
         if len(images_to_upload) != 0:
+            print(images_to_upload)
             print("STARTING PREPROCESSING THE DATA")
             preprocessed_images = [pipe(img, *PREPROCESSING[args.method]) for img in images_to_upload]
             if args.background_removal is True:
@@ -107,7 +108,14 @@ def main():
 
     ## Applying the process to the queries
     preprocessed_images = [pipe(img, *PREPROCESSING[args.method]) for img in QUERYS]
-    if args.background_removal is True:
+    if args.mask_folder:
+        dict_masks_test = utils.create_mask_dict_from_files(args.mask_folder)
+
+        for idx, (image, mask) in enumerate(zip(preprocessed_images, dict_masks_test.values())):
+            # print(mask.shape)
+            # print(image.shape)
+            preprocessed_images[idx] = (image * mask[:, :, None])
+    elif args.background_removal is True:
         dict_masks_test = pipes.generate_mask_dict(QUERYS)
         utils.save_descriptor_bbdd(dict_masks, filepath=DESCRIPTORS_PATH,
                                    filename=f"{query_dataset_name}" + "_masks.pkl")
