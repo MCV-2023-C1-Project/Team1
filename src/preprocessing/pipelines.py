@@ -122,6 +122,32 @@ def generate_pyramidal_histogram_descriptor(imgs:List[np.ndarray], steps:int=5, 
     return descriptors
 
 
+def generate_pyramidal_histogram_descriptor_masked(imgs:List[np.ndarray], masks: List[np.ndarray], steps:int=5, **kwargs):
+    """
+    Generate pyramidal histogram descriptors for a list of images.
+
+    Parameters:
+        imgs (List[np.ndarray]): List of input images.
+        steps (int): How big is the pyramidal representation (2**steps + 2**steps-1 ... ... ... ).
+        **kwargs: Additional keyword arguments for CD.get_multi_tile_histogram_descriptor.
+
+    Returns:
+        Dict[int, np.ndarray]: Dictionary of the pyramidal histogram descriptor for each image.
+    """
+    descriptors = {}
+    for idx, (img, mask) in tqdm(enumerate(zip(imgs, masks))):
+        assert mask is None or img.shape[:2] == mask.shape[:2]
+        descriptors[idx] = np.array([])
+        if mask is not None:
+            quad = utils.get_quad_from_mask(mask)
+        else:
+            quad = utils.Quad([[0, 0], [img.shape[0]-1, 0], [img.shape[0]-1, img.shape[1]-1], [0, img.shape[1]-1]])
+        feature = CD.get_piramidal_histogram_descriptor_quad(img, quad, steps, **kwargs)
+        descriptors[idx] = np.concatenate((descriptors[idx], feature.squeeze()), axis=-1)
+
+    return descriptors
+
+
 def generate_multiresolution_histogram_descriptor(imgs:List[np.ndarray], tiles:int=6, **kwargs):
     """
     Generate multiresolution histogram descriptors for a list of images.

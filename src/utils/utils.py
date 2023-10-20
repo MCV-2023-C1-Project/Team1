@@ -7,6 +7,7 @@ from typing import *
 from pathlib import  Path
 from PIL import Image
 from matplotlib import colors
+from scipy.spatial import ConvexHull
 
 
 import numpy as np
@@ -17,8 +18,8 @@ import pickle
 import os
 import torch
 import matplotlib.pyplot as plt
-
-
+import itertools
+import cv2
 
 
 def RG_Chroma_plotter(red,green):
@@ -413,5 +414,64 @@ def create_mask_dict_from_files(folder: str):
         mask = np.array(Image.open(file))
         mask_dict[file.with_suffix('.jpg').name] = mask
     
-    print(mask_dict)
+    print(mask_dict.keys())
     return mask_dict
+
+
+Point = Tuple[int, int]
+
+class Quad:
+    def __init__(self, points: List[Point]) -> None:
+        if len(points) != 4:
+            raise ValueError('Need exactly 4 points.')
+        self.V = np.array(points)
+        center = np.sum(self.V, axis=0) / 4
+        self.V = np.array(sorted(self.V, key=lambda x: np.arctan2(x[1] - center[1], x[0] - center[0])))
+    
+    def contains(self, point: Point):
+        point = np.array(point)
+
+        crossprods = []
+        for i in range(3):
+            crossprods.append(np.cross(self.V[i+1] - self.V[i], point - self.V[i]))
+        crossprods.append(np.cross(self.V[0] - self.V[3], point - self.V[3]))
+
+        signs = list(map(lambda x: x >= 0, crossprods))
+        if not any(signs):
+            print(f'Warning: are vertices ordered clockwise? {self.V=}')
+        return all(signs)
+    
+    def get_area(self):
+        return 0.5 * ((self.V[0,0] - self.V[2,0])*(self.V[1,1] - self.V[3,1]) - (self.V[1,0] - self.V[3,0])*(self.V[0,1] - self.V[2,1]))
+
+    def __getitem__(self, i):
+        return self.V[i]
+
+
+def get_quad_from_mask(mask):
+    conts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    hull = ConvexHull(np.flip(conts[0][: , 0], axis=-1))
+
+    points = np.flip(conts[0][: , 0], axis=-1)
+    max_area = 0
+    best_quad = None
+    for vertex_set in itertools.combinations(points[hull.vertices], 4):
+        temp_quad = Quad(vertex_set)
+        area = temp_quad.get_area()
+        if area > max_area:
+            max_area = area
+            best_quad = temp_quad
+    return best_quad
+
+
+def get_lines_intersection(l1p1, l1p2, l2p1, l2p2):
+    x1 = l1p1[0]; y1 = l1p1[1]
+    x2 = l1p2[0]; y2 = l1p2[1]
+
+    x3 = l2p1[0]; y3 = l2p1[1]
+    x4 = l2p2[0]; y4 = l2p2[1]
+
+    den = (x1 - x2)*(y3 - y4) - (y1 - y2)*(x3 - x4)
+    rx = ((x1*y2 - y1*x2)*(x3 - x4) - (x1 - x2)*(x3*y4 - y3*x4))/den
+    ry = ((x1*y2 - y1*x2)*(y3 - y4) - (y1 - y2)*(x3*y4 - y3*x4))/den
+    return np.array([rx, ry])

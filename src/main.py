@@ -18,13 +18,15 @@ def main():
                "cummulative":pipes.generate_cummulative_histogram_descriptors,
                "multitile":pipes.generate_1d_multi_tile_histogram_descriptors,
                "multiresolution": pipes.generate_multiresolution_histogram_descriptor,
-               "pyramidal":pipes.generate_pyramidal_histogram_descriptor}
+               "pyramidal":pipes.generate_pyramidal_histogram_descriptor,
+               "pyramidal_quad":pipes.generate_pyramidal_histogram_descriptor_masked}
 
     PREPROCESSING = {"gray_hist":[str, utils.read_img , utils.convert2gray],
                     "norm-rg":[str, utils.read_img],
                     "cummulative":[str, utils.read_img , utils.normalize_min_max, utils.convert2lab],
                     "multitile":[str, utils.read_img, utils.convert2lab],
                      "pyramidal":[str, utils.read_img, utils.convert2lab],
+                     "pyramidal_quad":[str, utils.read_img, utils.convert2lab],
                      "multiresolution":[str, utils.read_img, utils.convert2lab]}
 
     SIMILARITY = {"cosine": cos_sim,
@@ -70,22 +72,6 @@ def main():
             print(images_to_upload)
             print("STARTING PREPROCESSING THE DATA")
             preprocessed_images = [pipe(img, *PREPROCESSING[args.method]) for img in images_to_upload]
-            if args.background_removal is True:
-                dict_masks, check = utils.get_descriptor_database(filepath=DESCRIPTORS_PATH, filename=f"{query_dataset_name}"+"_masks.pkl")
-
-                print(check)
-                if not check:
-                    dict_masks = pipes.generate_mask_dict(images_to_upload)
-                    utils.save_descriptor_bbdd(dict_masks, filepath=DESCRIPTORS_PATH, filename=f"{query_dataset_name}"+"_masks.pkl")
-                #print(preprocessed_images)
-                #print(dict_masks.values())
-                for idx, (image, mask) in enumerate(zip(preprocessed_images, dict_masks.values())):
-
-                    #print(mask.shape)
-                    #print(image.shape)
-                    preprocessed_images[idx] = (image * mask[None, :, :])
-
-
             print("STARTING TO COMPUTE THE DESCRIPTORS OF THE IMAGES")
             if args.method in ["multitile", "multiresolution"]:
                 tiles = args.tiles
@@ -94,6 +80,9 @@ def main():
             elif args.method == "pyramidal":
                 new_descriptors = METHODS[args.method](preprocessed_images, steps=int(args.steps))
 
+            elif args.method == "pyramidal_quad":
+                mask_list = [None] * len(preprocessed_images)
+                new_descriptors = METHODS[args.method](preprocessed_images, mask_list, steps=int(args.steps))
 
             else:
                 new_descriptors = METHODS[args.method](preprocessed_images, density=True)
@@ -102,7 +91,6 @@ def main():
         for idx, im in enumerate(images_to_upload):
             descriptors_bdr[im.name] = new_descriptors[idx]
 
-        print(descriptors_bdr)
 
         utils.save_descriptor_bbdd(descriptors_bdr, filepath=MDESCRIPTOR_PATH)
 
@@ -110,14 +98,9 @@ def main():
     preprocessed_images = [pipe(img, *PREPROCESSING[args.method]) for img in QUERYS]
     if args.mask_folder:
         dict_masks_test = utils.create_mask_dict_from_files(args.mask_folder)
-
-        for idx, (image, mask) in enumerate(zip(preprocessed_images, dict_masks_test.values())):
-            # print(mask.shape)
-            # print(image.shape)
-            preprocessed_images[idx] = (image * mask[:, :, None])
     elif args.background_removal is True:
         dict_masks_test = pipes.generate_mask_dict(QUERYS)
-        utils.save_descriptor_bbdd(dict_masks, filepath=DESCRIPTORS_PATH,
+        utils.save_descriptor_bbdd(dict_masks_test, filepath=DESCRIPTORS_PATH,
                                    filename=f"{query_dataset_name}" + "_masks.pkl")
 
         for name, array in dict_masks_test.items():
@@ -135,11 +118,16 @@ def main():
 
     elif args.method == "pyramidal":
         query_descriptors = METHODS[args.method](preprocessed_images, steps=int(args.steps))
-
+    
+    elif args.method == "pyramidal_quad":
+        query_descriptors = METHODS[args.method](preprocessed_images, dict_masks_test.values(), steps=int(args.steps))
+    
     else:
         query_descriptors = METHODS[args.method](preprocessed_images)
-
-
+    
+    print(descriptors_bdr['bbdd_00001.jpg'])
+    print('-'*50)
+    print(query_descriptors[1])
 
     response = pipes.generate_K_response(descriptors_bdr=descriptors_bdr, descriptors_queries=query_descriptors, sim_func=SIMILARITY[args.similarity], k=int(args.k))
     if args.queryfile != False:
