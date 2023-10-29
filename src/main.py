@@ -132,6 +132,8 @@ def main():
     response = pipes.generate_K_response(descriptors_bdr=descriptors_bdr, descriptors_queries=query_descriptors, sim_func=SIMILARITY[args.similarity], k=int(args.k))
     if args.queryfile != False:
         print(mapk(querys_gt, response, k=1))
+        print(mapk(querys_gt, response, k=5))
+        print(mapk(querys_gt, response, k=10))
 
     print(response)
     #utils.write_pickle(response, RESULTS+"_qst2_"+f"{args.method}_{args.similarity}_"+"result.pkl")
