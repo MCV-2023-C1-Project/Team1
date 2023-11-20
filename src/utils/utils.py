@@ -1,72 +1,25 @@
-## from ....
-from utils import utils
+
+
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+from pathlib import Path
+from typing import List
+from PIL.Image import Image
+from PIL import Image as Im
+from skimage import filters
+from scipy.signal import convolve2d
+from sklearn.metrics import precision_score, recall_score, f1_score
+from tqdm import tqdm
+
 from typing import *
 
 
-
-from pathlib import  Path
-from PIL import Image
-from matplotlib import colors
-from scipy.spatial import ConvexHull
-
-
-import numpy as np
-import kornia as K
-
-
-import pickle
 import os
-import torch
-import matplotlib.pyplot as plt
-import itertools
 import cv2
-
-
-def RG_Chroma_plotter(red,green):
-    p_color = [(r, g, 1-r-g) for r,g in
-               zip(red.flatten(),green.flatten())]
-    norm = colors.Normalize(vmin=0,vmax=1.)
-    norm.autoscale(p_color)
-    p_color = norm(p_color).tolist()
-    fig = plt.figure(figsize=(10, 7), dpi=100)
-    ax = fig.add_subplot(111)
-    ax.scatter(red.flatten(),
-                green.flatten(),
-                c = p_color, alpha = 0.40)
-    ax.set_xlabel('Red Channel', fontsize = 20)
-    ax.set_ylabel('Green Channel', fontsize = 20)
-    ax.set_xlim([0, 1])
-    ax.set_ylim([0, 1])
-    plt.show()
-
-
-def retriev_image(descriptors_bdr:Dict[str, np.ndarray], compare_descriptor: np.ndarray, distance:Callable) -> List[Tuple[float, str]]:
-    """
-    Retrieve images based on a similarity measure between descriptors.
-
-    This function compares a given descriptor against a collection of descriptors and returns a sorted list of tuples
-    representing the similarity scores and corresponding image names.
-
-    Parameters:
-    - descriptors_bdr (Dict[str, np.ndarray]): A dictionary mapping image names to their respective descriptors.
-    - compare_descriptor (np.ndarray): The descriptor to compare against the collection of descriptors.
-    - distance (Callable): A callable distance function to measure similarity between descriptors.
-
-    Returns:
-    - List[Tuple[float, str]]: A list of tuples, each containing a similarity score (between 0 and 1) and the image name.
-      The list is sorted in descending order of similarity scores.
-    """
-
-    ## Have into account that we are assuming normlaized similarity where 1 is the maximun value
-    results = []
-    for idx, (name, descriptor) in enumerate(descriptors_bdr.items()):
-        result =  distance(descriptor, compare_descriptor)
-        results.append(tuple([result, idx]))
-
-    final = sorted(results, reverse=True)
-
-
-    return  final
+import copy
+import pickle
 
 def read_pickle(filepath:str) -> Any:
     """
@@ -84,7 +37,6 @@ def read_pickle(filepath:str) -> Any:
 
 
     return load_file
-
 def write_pickle(information:Any,filepath:str):
     """
     Serialize and write an object to the specified file using pickle.
@@ -98,116 +50,6 @@ def write_pickle(information:Any,filepath:str):
     os.makedirs(abs_path, exist_ok=True)
     with open(filepath, "wb") as f:
         pickle.dump(information, f)
-
-
-def create_descriptor_database(filepath:str, filename:Optional[str] = None) -> None:
-    """
-    Create an empty descriptor database and write it to a specified file.
-
-    Parameters:
-        filepath (str): The directory where the database file will be stored.
-        filename (str, optional): The name of the database file. Defaults to None.
-    """
-    db = {}
-    path = os.path.join(filepath, filename) if filename is not None else filepath
-
-    abs_path = os.path.dirname(path)
-    os.makedirs(abs_path, exist_ok=True)
-
-    write_pickle(db, path)
-
-def get_descriptor_database(filepath:str, filename:Optional[str] = None) -> Dict[str, np.ndarray]:
-    """
-    Retrieve the descriptor database from a specified file.
-
-    Parameters:
-        filepath (str): The directory where the database file is stored.
-        filename (str, optional): The name of the database file. Defaults to None.
-
-    Returns:
-        Tuple[Dict[str, np.ndarray], bool]: A tuple containing the loaded descriptor database and a flag indicating whether the database existed or not.
-    """
-    path = os.path.join(filepath, filename) if filename is not None else filepath
-    check = False
-    try:
-        load_descriptor = read_pickle(path)
-        check = True
-    except:
-        create_descriptor_database(filepath, filename)
-        load_descriptor = {}
-
-    return load_descriptor, check
-
-def merge_descriptor_database(descriptors:Dict[str, np.ndarray], filepath:str, overwrite:bool=False) -> bool:
-    """
-    Merge a dictionary of descriptors into the descriptor database.
-
-    Parameters:
-        descriptors (Dict[str, np.ndarray]): A dictionary of descriptors to be merged into the database.
-        filepath (str): The directory where the database file is stored.
-        overwrite (bool, optional): Flag to indicate whether to overwrite existing descriptors. Defaults to False.
-
-    Returns:
-        bool: A flag indicating whether the merge was successful or not.
-    """
-    descriptors_db:Dict[str, np.ndarray] = utils.get_descriptor_database(filepath)
-    flag = False
-    for name_descriptor, information in descriptors.items():
-        if (descriptors_db.get(name_descriptor, None) is None) or (overwrite is True):
-            descriptors[name_descriptor] = information
-            save_descriptor_bbdd(descriptors=descriptors, filepath=filepath)
-            flag = True
-
-    return flag
-
-def save_descriptor_bbdd(descriptors: Dict[str, np.ndarray], filepath:str, filename:Optional[str]= None) -> None:
-    """
-    Save a dictionary of descriptors to the descriptor database file.
-
-    Parameters:
-        descriptors (Dict[str, np.ndarray]): A dictionary of descriptors to be saved.
-        filepath (str): The directory where the database file is stored.
-        filename (str, optional): The name of the database file. Defaults to None.
-    """
-    if filename == None:
-        filename = os.path.basename(filepath)
-        filepath = os.path.dirname(filepath)
-
-    if not os.path.exists(filepath):
-        create_descriptor_database(filepath=filepath, filename=filename)
-
-    path = os.path.join(filepath, filename) if filename is not None else filepath
-    print(descriptors)
-    write_pickle(descriptors, path)
-
-
-def get_slices_from_image(path: str, ntiles:int) -> List[Path]:
-    """
-    Get image slices from the specified image.
-
-    Parameters:
-        path (str): The path to the input image.
-        ntiles (int): The number of slices/tiles to generate.
-
-    Returns:
-        List[Path]: A list of Path objects representing the generated slices.
-    """
-    tiles = slicer.slice(path, ntiles, save=False)
-
-    return tiles
-
-def save_tiles(tiles: List[Path], savefile: Path, **kwargs) -> None:
-    """
-    Save image slices/tiles to the specified directory.
-
-    Parameters:
-        tiles (List[Path]): A list of Path objects representing image slices.
-        savefile (Path): The directory where the slices will be saved.
-        **kwargs: Additional keyword arguments for customization.
-    """
-    slicer.save_tiles(tiles, directory=savefile, **kwargs)
-
-
 def read_bbdd(path: Type[str]) -> List[Type[Path]]:
     """
     Reads image files from the specified directory path and returns a list of image file names.
@@ -225,253 +67,282 @@ def read_bbdd(path: Type[str]) -> List[Type[Path]]:
     return img_list
 
 
-def image2tensor(img: Image.Image) -> np.ndarray:
+def harmonize_tokens(text):
+    final_text = []
+    if len(text) > 0:
+        for t in text:
+            t = t.split(" ")
+            for st in t:
+                ext = [c for c in st if c.isalpha()]
+                ext = "".join(ext)
+                if len(ext) > 0:
+                    final_text.append(ext)
+    final_text = sorted(final_text)
+    final_text = " ".join(final_text)
+
+    return final_text
+
+def read_author_bbdd(path: Type[str]) -> List[Type[Path]]:
+    p = Path(path)
+    img_list = list(p.glob("*.txt")) # lista [~/BBDD/bbdd_0000.jpg ...]
+    return img_list
+
+
+def sharpening(img):
+    kernel = np.array([[0, -1, 0],
+                       [-1, 4, -1],
+                       [0, -1, 0]])
+    sharpened = cv2.filter2D(img, -1, kernel)
+
+    return sharpened
+
+def estimate_noise(img: np.ndarray):
+
+    if len(img.shape) > 2:
+        img = (cv2.cvtColor(img, cv2.COLOR_RGB2GRAY))
+
+    H, W = img.shape[:2]
+
+    M = [[1, -2, 1],
+       [-2, 4, -2],
+       [1, -2, 1]]
+
+    sigma = np.sum(np.sum(np.absolute(convolve2d(img, M))))
+    sigma = sigma * np.sqrt(0.5 * np.pi) / (6 * (W-2) * (H-2))
+
+    return sigma
+
+
+
+def apply_gaborfilter_bank(img:np.ndarray, filters:List[np.ndarray]):
+    # This general function is designed to apply filters to our image
+
+    # First create a numpy array the same size as our input image
+    newimage = np.zeros_like(img)
+
+    # Starting with a blank image, we loop through the images and apply our Gabor Filter
+    # On each iteration, we take the highest value (super impose), until we have the max value across all filters
+    # The final image is returned
+    depth = -1  # remain depth same as original image
+
+    for kern in filters:  # Loop through the kernels in our GaborFilter
+        image_filter = cv2.filter2D(img, depth, kern)  # Apply filter to image
+
+        # Using Numpy.maximum to compare our filter and cumulative image, taking the higher value (max)
+        np.maximum(newimage, image_filter, newimage)
+    return newimage
+
+def Sobel_magnitude(im, x_importance:float=2, y_importance:float=2):
+    "Get magnitude of gradient for given image"
+    ddepth = cv2.CV_64F
+    dx = cv2.Sobel(im, ddepth, 1, 0, ksize=3, scale=1)
+    dy = cv2.Sobel(im, ddepth, 0, 1, ksize=3, scale=1)
+    dxabs = cv2.convertScaleAbs(dx)
+    dyabs = cv2.convertScaleAbs(dy)
+    mag = cv2.addWeighted(dxabs, x_importance, dyabs, y_importance, 0)
+    return mag
+
+
+def scharr_filter(grayscale_img, sobel):
+    # set the kernel size, depending on whether we are using the Sobel
+    # operator of the Scharr operator, then compute the gradients along
+    # the x and y axis, respectively
+    # ksize = -1 if args["scharr"] > 0 else 3
+    if sobel:
+        ksize = 3
+    else:
+        ksize = -1
+
+    gX = cv2.Sobel(grayscale_img, ddepth=cv2.CV_64F, dx=1, dy=0, ksize=ksize, delta=1)
+    gY = cv2.Sobel(grayscale_img, ddepth=cv2.CV_64F, dx=0, dy=1, ksize=ksize, delta=1)
+    # the gradient magnitude images are now of the floating point data
+    # type, so we need to take care to convert them back a to unsigned
+    # 8-bit integer representation so other OpenCV functions can operate
+    # on them and visualize them
+    gX = cv2.convertScaleAbs(gX)
+    gY = cv2.convertScaleAbs(gY)
+    # combine the gradient representations into a single image
+    combined = cv2.addWeighted(gX, 0.5, gY, 0.5, 0)
+    combined = cv2.threshold(combined, 125, 255, cv2.THRESH_BINARY)[1]
+
+    return combined
+
+
+def create_gaborfilter_bank(**kwargs):
+    # This function is designed to produce a set of GaborFilters
+    # an even distribution of theta values equally distributed amongst pi rad / 180 degree
+
+    filters = []
+    num_filters = kwargs.get("n_filters", 20)
+    ksize = kwargs.get("ksize", 32)  # The local area to evaluate
+    sigma = kwargs.get("sigma",4.0)   # Larger Values produce more edges
+    print(num_filters)
+    print(ksize)
+    print(sigma)
+    lambd = 10.0
+    gamma = 0.5
+    psi = 0  # Offset value - lower generates cleaner results
+    for theta in np.arange(0, np.pi, np.pi / num_filters):  # Theta is the orientation for edge detection
+        kern = cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, psi, ktype=cv2.CV_64F)
+        kern /= 1.0 * kern.sum()  # Brightness normalization
+        filters.append(kern)
+    return filters
+
+def normalize(img, m=0., mx=1.):
+    return cv2.normalize(img, None, m, mx, cv2.NORM_MINMAX, dtype=cv2.CV_64F)
+
+def convert2image(img:np.ndarray):
+    return (img*255).astype("uint8")
+
+
+
+
+## Morphological operations
+def apply_morpholical_grad(image, kernel):
+    if isinstance(kernel, tuple):
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT,
+                                           kernel)
+
+    op = cv2.morphologyEx(image, cv2.MORPH_GRADIENT, kernel)
+    return op
+
+
+def apply_open(image, kernel, iters: int = 3):
+    if isinstance(kernel, tuple):
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT,
+                                           kernel)
+
+    op = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel, iters)
+    return op
+
+
+def apply_dilate(image, kernel, iterations: int = 5):
+    if isinstance(kernel, tuple):
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT,
+                                           kernel)
+
+    op = cv2.dilate(image, kernel, iterations=iterations)
+    return op
+
+
+def apply_closing(image, kernel):
+    if isinstance(kernel, tuple):
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT,
+                                           kernel)
+
+    closing = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
+    return closing
+
+
+def apply_erode(image, kernel):
+    if isinstance(kernel, tuple):
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT,
+                                           kernel)
+
+    op = cv2.erode(image, kernel)
+    return op
+
+
+def check_overlap(ba, bb, threshold: float = 0.5):
+    y1, x1, h1, w1 = ba
+    y2, x2, h2, w2 = bb
+
+    # Calculate the coordinates of the bounding boxes
+    x1_min, y1_min, x1_max, y1_max = x1, y1, x1 + w1, y1 + h1
+    x2_min, y2_min, x2_max, y2_max = x2, y2, x2 + w2, y2 + h2
+
+    # Calculate the intersection area
+    intersection_area = max(0, min(x1_max, x2_max) - max(x1_min, x2_min)) * \
+                        max(0, min(y1_max, y2_max) - max(y1_min, y2_min))
+
+    # Calculate areas of each bounding box
+    area_bbox1 = (x1_max - x1_min) * (y1_max - y1_min)
+    area_bbox2 = (x2_max - x2_min) * (y2_max - y2_min)
+
+    # Calculate areas of each bounding box
+    area_bbox1 = w1 * h1
+    area_bbox2 = w2 * h2
+
+    overlap_ratio = intersection_area / min(area_bbox1, area_bbox2)
+    return overlap_ratio >= threshold
+
+def non_maximun_supression(bboxes: list, threshold: float = 0.5):
+    final_voting = []
+    bbox_list = copy.copy(bboxes)
+    while len(bbox_list) > 0:
+        current_box = bbox_list.pop(0)
+        final_voting.append(current_box)
+        for bbox in bbox_list:
+            overlap = check_overlap(current_box[0], bbox[0])
+            if overlap:
+                bbox_list.remove(bbox)
+
+    return final_voting
+
+
+
+def apk(actual, predicted, k=10):
+    """
+    Computes the average precision at k.
+
+    This function computes the average prescision at k between two lists of
+    items.
+
+    Parameters
+    ----------
+    actual : list
+             A list of elements that are to be predicted (order doesn't matter)
+    predicted : list
+                A list of predicted elements (order does matter)
+    k : int, optional
+        The maximum number of predicted elements
+
+    Returns
+    -------
+    score : double
+            The average precision at k over the input lists
 
     """
-    Convert an image to a tensor.
 
-    Parameters:
-        img (Image): The input image as an instance of the Image class.
+    if len(predicted)>k:
+        predicted = predicted[:k]
 
-    Returns:
-        np.ndarray: The image represented as a NumPy array (tensor).
+    score = 0.0
+    num_hits = 0.0
+
+    for i,p in enumerate(predicted):
+        if p in actual and p not in predicted[:i]:
+            num_hits += 1.0
+            score += num_hits / (i+1.0)
+
+    if not actual:
+        return 0.0
+
+    return score / min(len(actual), k)
+
+def mapk(actual, predicted, k=10):
     """
-    im = np.array(img)
-    return K.image_to_tensor(im)
-def convert2gray(img: np.ndarray) -> np.ndarray:
-    """
-    Convert an RGB image to grayscale.
+    Computes the mean average precision at k.
 
-    Parameters:
-        img (np.ndarray): The input RGB image as a NumPy array.
+    This function computes the mean average prescision at k between two lists
+    of lists of items.
 
-    Returns:
-        np.ndarray: The grayscale image as a NumPy array.
-    """
-    return K.tensor_to_image(K.color.rgb_to_grayscale(img))
+    Parameters
+    ----------
+    actual : list
+             A list of lists of elements that are to be predicted
+             (order doesn't matter in the lists)
+    predicted : list
+                A list of lists of predicted elements
+                (order matters in the lists)
+    k : int, optional
+        The maximum number of predicted elements
 
-def convert2luv(img: np.ndarray) -> np.ndarray:
-    """
-    Convert an RGB image to LUV color space.
-
-    Parameters:
-        img (np.ndarray): The input RGB image as a NumPy array.
-
-    Returns:
-        np.ndarray: The image in LUV color space as a NumPy array.
-    """
-    return K.tensor_to_image(K.color.rgb_to_luv(img))
-
-def convert2lab(img: np.ndarray) -> np.ndarray:
-    """
-    Convert an RGB image to LAB color space.
-
-    Parameters:
-        img (np.ndarray): The input RGB image as a NumPy array.
-
-    Returns:
-        np.ndarray: The image in LAB color space as a NumPy array.
-    """
-    return K.tensor_to_image(K.color.rgb_to_lab(img))
-
-def convert2rgchromaticity(img: np.ndarray) -> np.ndarray:
-    """
-    Convert a linear RGB image to rg chromaticity color space.
-
-    Parameters:
-        img (np.ndarray): The input linear RGB image as a NumPy array.
-
-    Returns:
-        np.ndarray: The image in rg chromaticity color space as a NumPy array.
-    """
-    sum = img[:,:,0] + img[:,:,1] + img[:,:,2]
-    return img / sum[:, :, None]
-
-def normalize_min_max(x: torch.Tensor, min_val: float = 0.0, max_val: float = 1.0, eps: float = 1e-6) -> torch.Tensor:
-    r"""Normalise an image/video tensor by MinMax and re-scales the value between a range.
-
-    The data is normalised using the following formulation:
-
-    .. math::
-        y_i = (b - a) * \frac{x_i - \text{min}(x)}{\text{max}(x) - \text{min}(x)} + a
-
-    where :math:`a` is :math:`\text{min_val}` and :math:`b` is :math:`\text{max_val}`.
-
-    Args:
-        x: The image tensor to be normalised with shape :math:`(B, C, *)`.
-        min_val: The minimum value for the new range.
-        max_val: The maximum value for the new range.
-        eps: Float number to avoid zero division.
-
-    Returns:
-        The normalised image tensor with same shape as input :math:`(B, C, *)`.
+    Returns
+    -------
+    score : double
+            The mean average precision at k over the input lists
 
     """
-    if not isinstance(x, torch.Tensor):
-        raise TypeError(f"data should be a tensor. Got: {type(x)}.")
+    return np.mean([apk(a,p,k) for a,p in zip(actual, predicted)])
 
-    if not isinstance(min_val, float):
-        raise TypeError(f"'min_val' should be a float. Got: {type(min_val)}.")
-
-    if not isinstance(max_val, float):
-        raise TypeError(f"'b' should be a float. Got: {type(max_val)}.")
-
-    if len(x.shape) < 3:
-        raise ValueError(f"Input shape must be at least a 3d tensor. Got: {x.shape}.")
-
-    x = x.unsqueeze(0) if len(x.shape) == 3 else x
-    shape = x.shape
-    B, C = shape[0], shape[1]
-
-    x_min: torch.Tensor = x.reshape(B, C, -1).min(-1)[0].view(B, C, 1)
-    x_max: torch.Tensor = x.reshape(B, C, -1).max(-1)[0].view(B, C, 1)
-
-    x_out: torch.Tensor = (max_val - min_val) * (x.reshape(B, C, -1) - x_min) / (x_max - x_min + eps) + min_val
-    return x_out.reshape(shape)
-
-
-def read_img(img_path: Path):
-    """
-    Opens an image file specified by the provided file path using the PIL library.
-
-    Args:
-        img_path (Path): The path to the image file.
-
-    Returns:
-        Image.Image: A PIL Image object representing the opened image.
-    """
-    img = K.io.load_image(img_path, K.io.ImageLoadType.RGB32)
-
-    return img
-    #return Image.open(img_path)
-
-
-def transform_tiles_colorspace(tiles: List[Image.Image], colorspace: Callable) -> List[np.ndarray]:
-    """
-    Transform tiles' colorspace using the specified colorspace transformation function.
-
-    Parameters:
-        tiles (List[Image]): A list of images represented as instances of the Image class.
-        colorspce (Callable): A callable representing a colorspace transformation function.
-
-    Returns:
-        List[np.ndarray]: A list of NumPy arrays representing the converted tiles.
-    """
-    converted_tiles = []
-    for im in tiles:
-        img = utils.image2tensor(im.image)
-        img = utils.normalize_min_max(img)
-        img = colorspace(img)
-        converted_tiles.append(img)
-
-    return converted_tiles
-
-
-def split_nd_tiles_colorspace(tiles: List[np.ndarray]) -> Tuple[np.ndarray]:
-    """
-    Split N-dimensional tiles into individual color channels.
-
-    Parameters:
-        tiles (List[np.ndarray]): A list of NumPy arrays representing N-dimensional color tiles.
-
-    Returns:
-        Tuple[np.ndarray]: A tuple containing N arrays representing individual color channels.
-    """
-    channels = [split_image_colorspace(tile) for tile in tiles]
-    channel_arrays = tuple(np.array(channel) for channel in zip(*channels))
-    return channel_arrays
-
-
-# Example usage
-# Assume 'tiles' is a list of N-dimensional color tiles
-# channel_arrays = split_nd_tiles_colorspace(tiles)
-# channel_arrays will contain the N arrays representing individual color channels
-
-def split_image_colorspace(image: np.ndarray) -> Tuple[np.ndarray]:
-    """
-    Split an N-dimensional image into individual color channels.
-
-    Parameters:
-        image (np.ndarray): A NumPy array representing an N-dimensional color image.
-
-    Returns:
-        Tuple[np.ndarray]: A tuple containing N arrays representing individual color channels.
-    """
-    # Split the image into color channels
-    channels = np.split(image, image.shape[-1], axis=-1)
-    return tuple(channels)
-
-# Example usage
-# Assume 'image' is a 3-dimensional color image (e.g., height x width x channels)
-# channel_arrays = split_image_colorspace(image)
-# channel_arrays will contain the 3 arrays representing individual color channels
-
-
-def create_mask_dict_from_files(folder: str):
-    mask_dict = {}
-
-    for file in Path(folder).glob('*.png'):
-        mask = np.array(Image.open(file))
-        mask_dict[file.with_suffix('.jpg').name] = mask
-    
-    print(mask_dict.keys())
-    return mask_dict
-
-
-Point = Tuple[int, int]
-
-class Quad:
-    def __init__(self, points: List[Point]) -> None:
-        if len(points) != 4:
-            raise ValueError('Need exactly 4 points.')
-        self.V = np.array(points)
-        center = np.sum(self.V, axis=0) / 4
-        self.V = np.array(sorted(self.V, key=lambda x: np.arctan2(x[1] - center[1], x[0] - center[0])))
-    
-    def contains(self, point: Point):
-        point = np.array(point)
-
-        crossprods = []
-        for i in range(3):
-            crossprods.append(np.cross(self.V[i+1] - self.V[i], point - self.V[i]))
-        crossprods.append(np.cross(self.V[0] - self.V[3], point - self.V[3]))
-
-        signs = list(map(lambda x: x >= 0, crossprods))
-        if not any(signs):
-            print(f'Warning: are vertices ordered clockwise? {self.V=}')
-        return all(signs)
-    
-    def get_area(self):
-        return 0.5 * ((self.V[0,0] - self.V[2,0])*(self.V[1,1] - self.V[3,1]) - (self.V[1,0] - self.V[3,0])*(self.V[0,1] - self.V[2,1]))
-
-    def __getitem__(self, i):
-        return self.V[i]
-
-
-def get_quad_from_mask(mask):
-    conts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    hull = ConvexHull(np.flip(conts[0][: , 0], axis=-1))
-
-    points = np.flip(conts[0][: , 0], axis=-1)
-    max_area = 0
-    best_quad = None
-    for vertex_set in itertools.combinations(points[hull.vertices], 4):
-        temp_quad = Quad(vertex_set)
-        area = temp_quad.get_area()
-        if area > max_area:
-            max_area = area
-            best_quad = temp_quad
-    return best_quad
-
-
-def get_lines_intersection(l1p1, l1p2, l2p1, l2p2):
-    x1 = l1p1[0]; y1 = l1p1[1]
-    x2 = l1p2[0]; y2 = l1p2[1]
-
-    x3 = l2p1[0]; y3 = l2p1[1]
-    x4 = l2p2[0]; y4 = l2p2[1]
-
-    den = (x1 - x2)*(y3 - y4) - (y1 - y2)*(x3 - x4)
-    rx = ((x1*y2 - y1*x2)*(x3 - x4) - (x1 - x2)*(x3*y4 - y3*x4))/den
-    ry = ((x1*y2 - y1*x2)*(y3 - y4) - (y1 - y2)*(x3*y4 - y3*x4))/den
-    return np.array([rx, ry])

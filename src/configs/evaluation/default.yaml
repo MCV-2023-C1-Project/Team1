@@ -1,0 +1,20 @@
+retrieval:
+  evaluate: False
+  path: ${data.QS.path}/gt_corresps.pkl
+  k: 10
+  similarity: main.jensensim
+
+masking:
+  evaluate: True
+  path: ${data.QS.path}
+
+text:
+  evaluate: False
+  path: ${data.QS.path}/text_boxes.pkl
+
+ocr:
+  evaluate: False
+  path: ${data.QS.path}
+
+
+path: ${hydra:runtime.cwd}/results/${data.QN}
